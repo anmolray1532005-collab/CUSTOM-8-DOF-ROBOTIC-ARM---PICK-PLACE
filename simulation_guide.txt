@@ -1,0 +1,55 @@
+8DOF ARM: COMPLETE PICK-AND-PLACE SIMULATION GUIDE
+==================================================
+This guide provides the exact terminal commands to launch the Gazebo Harmonic 
+physics simulation, spawn the environment (with anti-roll physics), and execute 
+the automated pick-and-place Python script for the 8DOF robotic arm.
+
+PROJECT LOCATION
+----------------
+All source files must be located in: `~/pick_place_ws/src/`
+
+TERMINAL 1: Compile Workspace & Launch Gazebo
+---------------------------------------------
+Open a WSL terminal and run:
+1.  cd ~/pick_place_ws
+2.  source /opt/ros/jazzy/setup.bash
+3.  colcon build --packages-select Arm_description
+4.  source ~/pick_place_ws/install/setup.bash
+5.  export GZ_SIM_RESOURCE_PATH=~/pick_place_ws/install/Arm_description/share:$GZ_SIM_RESOURCE_PATH
+6.  gz sim -r empty.sdf
+*Note: Make sure the simulation clock is running (Play button in bottom left).*
+
+TERMINAL 2: Clock Bridge & Robot State Publisher
+------------------------------------------------
+Open a 2nd WSL terminal and run:
+1.  source /opt/ros/jazzy/setup.bash
+2.  source ~/pick_place_ws/install/setup.bash
+3.  ros2 run ros_gz_bridge parameter_bridge /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock &
+4.  ros2 run robot_state_publisher robot_state_publisher --ros-args -p robot_description:="$(cat /tmp/arm_p2.urdf)" -p use_sim_time:=true
+
+TERMINAL 3: Spawn the Environment & Controllers
+-----------------------------------------------
+Open a 3rd WSL terminal and run:
+1.  source /opt/ros/jazzy/setup.bash
+2.  source ~/pick_place_ws/install/setup.bash
+3.  ros2 run ros_gz_sim create -file /tmp/arm_p2.urdf -name Arm
+4.  ros2 run ros_gz_sim create -file ~/pick_place_ws/src/green_pedestal.sdf -name init_pedestal -x 0.17 -y 0.0 -z 0.02
+5.  ros2 run ros_gz_sim create -file ~/pick_place_ws/src/blue_pedestal.sdf -name final_pedestal -x 0.062 -y 0.158 -z 0.02
+6.  ros2 run ros_gz_sim create -file ~/pick_place_ws/src/target_ball.sdf -name target_ball -x 0.17 -y 0.0 -z 0.058
+7.  ros2 run controller_manager spawner joint_state_broadcaster --ros-args -p use_sim_time:=true
+8.  ros2 run controller_manager spawner arm_controller --ros-args -p use_sim_time:=true
+9.  ros2 run controller_manager spawner gripper_controller --ros-args -p use_sim_time:=true
+*Note: Wait until all three controllers say "Configured and activated".*
+
+TERMINAL 4: Execute the Python Script
+-------------------------------------
+Open a 4th WSL terminal and run:
+1.  source /opt/ros/jazzy/setup.bash
+2.  source ~/pick_place_ws/install/setup.bash
+3.  python3 ~/pick_place_ws/src/pick_and_place.py
+
+PHYSICS NOTES
+-------------
+If the ball bounces or rolls off the pedestals, ensure `target_ball.sdf` is 
+using the "Invisible Cylinder Hack" (a cylinder collision mesh with a spherical 
+visual mesh) and soft-contact parameters (<min_depth>0.005</min_depth>).
